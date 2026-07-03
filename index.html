@@ -58,11 +58,34 @@ button:active { transform: scale(0.98); }
 .loading-spinner { font-size: 32px; display: block; margin-bottom: 1rem; animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .error-box { background: #fef2f2; border: 0.5px solid #fca5a5; border-radius: 10px; padding: 1rem 1.25rem; color: #b91c1c; font-size: 14px; line-height: 1.6; margin-bottom: 1rem; }
+
+/* バッジ */
+.badge-section { margin-top: 1.5rem; }
+.badge-section-title { font-size: 13px; color: #666; margin-bottom: 0.6rem; }
+.badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+.badge-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0.6rem 0.25rem; background: #fff; border-radius: 10px; border: 0.5px solid #ddd; }
+.badge-item.earned { background: #fffbeb; border-color: #fcd34d; }
+.badge-item.earned-new { background: #fffbeb; border-color: #f59e0b; animation: pop 0.4s ease; }
+.badge-item.locked { opacity: 0.35; filter: grayscale(1); }
+@keyframes pop { 0%{transform:scale(0.7);opacity:0} 70%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+.badge-icon { font-size: 24px; line-height: 1; }
+.badge-name { font-size: 10px; color: #555; text-align: center; line-height: 1.3; }
+.badge-item.earned .badge-name, .badge-item.earned-new .badge-name { color: #92400e; font-weight: 500; }
+.daily-badge-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 0.75rem; }
+.daily-badge-item { display: flex; align-items: center; gap: 10px; padding: 0.7rem 0.9rem; background: #fff; border-radius: 10px; border: 0.5px solid #ddd; }
+.daily-badge-item.earned { background: #fffbeb; border-color: #fcd34d; }
+.daily-badge-item.earned-new { background: #fffbeb; border-color: #f59e0b; animation: pop 0.4s ease; }
+.daily-badge-item.locked { opacity: 0.35; filter: grayscale(1); }
+.daily-badge-icon { font-size: 22px; }
+.daily-badge-info { flex: 1; }
+.daily-badge-name { font-size: 12px; font-weight: 500; color: #333; }
+.daily-badge-item.earned .daily-badge-name, .daily-badge-item.earned-new .daily-badge-name { color: #92400e; }
+.daily-badge-desc { font-size: 11px; color: #888; margin-top: 1px; }
+.daily-count { font-size: 11px; color: #f59e0b; font-weight: 500; margin-top: 2px; }
 </style>
 </head>
 <body>
 
-<!-- ローディング画面 -->
 <div id="screen-loading" class="screen active">
   <div class="loading">
     <span class="loading-spinner">🍫</span>
@@ -70,7 +93,6 @@ button:active { transform: scale(0.98); }
   </div>
 </div>
 
-<!-- 設定画面 -->
 <div id="screen-setup" class="screen">
   <h1>チョコ検</h1>
   <p class="subtitle">章と問題数を選んでください</p>
@@ -85,7 +107,6 @@ button:active { transform: scale(0.98); }
   <button class="btn-primary" onclick="startQuiz()">クイズを始める</button>
 </div>
 
-<!-- クイズ画面 -->
 <div id="screen-quiz" class="screen">
   <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
   <div class="q-count" id="q-count"></div>
@@ -97,7 +118,6 @@ button:active { transform: scale(0.98); }
   </div>
 </div>
 
-<!-- 結果画面 -->
 <div id="screen-result" class="screen">
   <h1>結果</h1>
   <div class="result-score" id="result-score"></div>
@@ -106,6 +126,19 @@ button:active { transform: scale(0.98); }
     <div class="stat-card"><div class="s-label">正解数</div><div class="s-val" id="stat-correct" style="color:#15803d"></div></div>
     <div class="stat-card"><div class="s-label">不正解数</div><div class="s-val" id="stat-wrong" style="color:#b91c1c"></div></div>
   </div>
+
+  <!-- デイリーバッジ -->
+  <div class="badge-section">
+    <div class="badge-section-title">☀️ デイリーバッジ</div>
+    <div class="daily-badge-grid" id="daily-badge-grid"></div>
+  </div>
+
+  <!-- 通常バッジ -->
+  <div class="badge-section">
+    <div class="badge-section-title">🏅 獲得バッジ</div>
+    <div class="badge-grid" id="badge-grid"></div>
+  </div>
+
   <div class="history-section" id="history-section"></div>
   <div style="margin-top:1.25rem;display:flex;gap:10px;">
     <button class="btn-ghost" style="flex:1" onclick="goSetup()">もう一度</button>
@@ -116,7 +149,6 @@ button:active { transform: scale(0.98); }
 <script>
 const $ = id => document.getElementById(id);
 
-// ★ JSONファイル名のリスト（章を増やす場合はここに追加）
 const JSON_FILES = [
   { file: 'quiz_第1章_medium.json', chapter: '第1章' },
   { file: 'quiz_第2章_medium.json', chapter: '第2章' },
@@ -124,6 +156,23 @@ const JSON_FILES = [
   { file: 'quiz_第4章_medium.json', chapter: '第4章' },
   { file: 'quiz_第5章_medium.json', chapter: '第5章' },
   { file: 'quiz_第6章_medium.json', chapter: '第6章' },
+];
+
+// 通常バッジ定義
+const BADGES = [
+  { id: 'first',    icon: '🍫', name: 'チョコ入門',    desc: '初回クイズ完了' },
+  { id: 'pass70',   icon: '⭐', name: '合格ライン',    desc: '正答率70%以上' },
+  { id: 'master',   icon: '🥇', name: 'チョコマスター', desc: '正答率90%以上' },
+  { id: 'perfect',  icon: '💯', name: 'パーフェクト',   desc: '全問正解' },
+  { id: 'allchap',  icon: '🔥', name: '全章制覇',      desc: '全6章で出題' },
+  { id: 'study30',  icon: '📚', name: '猛勉強',        desc: '30問クリア' },
+  { id: 'streak10', icon: '🎯', name: '連続正解',      desc: '10問連続正解' },
+];
+
+// デイリーバッジ定義
+const DAILY_BADGES = [
+  { id: 'daily_challenge', icon: '☀️', name: '今日のチャレンジ', desc: '本日 正答率80%以上' },
+  { id: 'daily_perfect',   icon: '🌟', name: 'デイリーパーフェクト', desc: '本日 全問正解' },
 ];
 
 let allQuestions = {};
@@ -134,9 +183,33 @@ let quizQueue = [];
 let currentIdx = 0;
 let correctCount = 0;
 let sessionHistory = [];
+let consecutiveCorrect = 0;
+let maxConsecutive = 0;
 
 const NUM_OPTIONS = [5, 10, 20, 30];
 const KEYS = ['A', 'B', 'C', 'D'];
+const TOTAL_CHAPTERS = 6;
+
+// localStorage キー
+const LS_BADGES    = 'chocoken_badges';
+const LS_DAILY     = 'chocoken_daily';
+
+function today() {
+  return new Date().toISOString().slice(0, 10); // "2025-07-04"
+}
+
+function loadBadges() {
+  try { return JSON.parse(localStorage.getItem(LS_BADGES)) || {}; } catch { return {}; }
+}
+function saveBadges(data) {
+  localStorage.setItem(LS_BADGES, JSON.stringify(data));
+}
+function loadDaily() {
+  try { return JSON.parse(localStorage.getItem(LS_DAILY)) || {}; } catch { return {}; }
+}
+function saveDaily(data) {
+  localStorage.setItem(LS_DAILY, JSON.stringify(data));
+}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -144,9 +217,9 @@ function showScreen(id) {
   window.scrollTo(0, 0);
 }
 
-// 起動時にJSONを自動読み込み
 async function loadAllJSON() {
   const errors = [];
+  // ランダム性向上：全問題を一度フラットに集めてからシャッフル済みプールを作る
   for (const entry of JSON_FILES) {
     try {
       const res = await fetch(entry.file);
@@ -164,14 +237,11 @@ async function loadAllJSON() {
 
 async function init() {
   const errors = await loadAllJSON();
-  const loaded = Object.keys(allQuestions);
-
-  if (loaded.length === 0) {
+  if (Object.keys(allQuestions).length === 0) {
     $('error-area').innerHTML = `<div class="error-box">JSONファイルが読み込めませんでした。<br>index.htmlと同じフォルダにJSONファイルが置かれているか確認してください。</div>`;
   } else if (errors.length > 0) {
-    $('error-area').innerHTML = `<div class="error-box">一部のファイルが読み込めませんでした：${errors.join(', ')}</div>`;
+    $('error-area').innerHTML = `<div class="error-box">一部ファイルが読み込めませんでした：${errors.join(', ')}</div>`;
   }
-
   buildSetupScreen();
   showScreen('screen-setup');
 }
@@ -239,15 +309,33 @@ function shuffleArray(arr) {
   return a;
 }
 
+// ランダム性向上：章をまたいで均等に問題を分散してから抽出
+function buildQuizPool(chapters, num) {
+  // 各章からシャッフルした問題リストを用意
+  const pools = chapters.map(ch => shuffleArray(allQuestions[ch].map(q => ({ ...q, chapter: ch }))));
+  const result = [];
+  let i = 0;
+  // ラウンドロビンで各章から1問ずつ取り出すことで章の偏りをなくす
+  while (result.length < num) {
+    const pool = pools[i % pools.length];
+    const taken = Math.floor(result.length / pools.length);
+    if (pool[taken]) result.push(pool[taken]);
+    i++;
+    // 全プールを使い切ったら2周目へ（各章内はシャッフル済みなので重複感が出にくい）
+    if (i >= pools.length * Math.ceil(num / pools.length)) break;
+  }
+  // 最後にもう一度シャッフルして章の順序も混ぜる
+  return shuffleArray(result).slice(0, num);
+}
+
 function startQuiz() {
   const chapters = allSelected ? Object.keys(allQuestions) : Array.from(selectedChapters);
   if (chapters.length === 0) { alert('章を選んでください'); return; }
-  let pool = [];
-  chapters.forEach(ch => pool.push(...allQuestions[ch].map(q => ({ ...q, chapter: ch }))));
-  pool = shuffleArray(pool);
-  quizQueue = pool.slice(0, numQuestions);
+  quizQueue = buildQuizPool(chapters, numQuestions);
   currentIdx = 0;
   correctCount = 0;
+  consecutiveCorrect = 0;
+  maxConsecutive = 0;
   sessionHistory = [];
   showQuestion();
   showScreen('screen-quiz');
@@ -300,7 +388,13 @@ function selectAnswer(selected, answer, explanation) {
   });
 
   const isCorrect = selected === answer;
-  if (isCorrect) correctCount++;
+  if (isCorrect) {
+    correctCount++;
+    consecutiveCorrect++;
+    if (consecutiveCorrect > maxConsecutive) maxConsecutive = consecutiveCorrect;
+  } else {
+    consecutiveCorrect = 0;
+  }
   sessionHistory.push({ question: quizQueue[currentIdx].question, correct: isCorrect, chapter: quizQueue[currentIdx].chapter });
 
   const expEl = $('explanation');
@@ -315,6 +409,88 @@ function nextQuestion() {
   else showQuestion();
 }
 
+// バッジ判定＆保存
+function evaluateBadges(pct, total, chapters) {
+  const earned = loadBadges();
+  const newlyEarned = new Set();
+
+  function grant(id) {
+    if (!earned[id]) { earned[id] = true; newlyEarned.add(id); }
+  }
+
+  grant('first');
+  if (pct >= 70) grant('pass70');
+  if (pct >= 90) grant('master');
+  if (pct === 100) grant('perfect');
+  if (chapters.length >= TOTAL_CHAPTERS) grant('allchap');
+  if (total >= 30) grant('study30');
+  if (maxConsecutive >= 10) grant('streak10');
+
+  saveBadges(earned);
+  return { earned, newlyEarned };
+}
+
+// デイリーバッジ判定＆保存
+function evaluateDailyBadges(pct) {
+  const daily = loadDaily();
+  const t = today();
+  if (!daily[t]) daily[t] = {};
+  const newlyEarned = new Set();
+
+  if (pct >= 80 && !daily[t]['daily_challenge']) {
+    daily[t]['daily_challenge'] = true;
+    newlyEarned.add('daily_challenge');
+  }
+  if (pct === 100 && !daily[t]['daily_perfect']) {
+    daily[t]['daily_perfect'] = true;
+    newlyEarned.add('daily_perfect');
+  }
+
+  saveDaily(daily);
+
+  // 通算獲得日数を集計
+  const counts = {};
+  DAILY_BADGES.forEach(b => counts[b.id] = 0);
+  Object.values(daily).forEach(dayData => {
+    DAILY_BADGES.forEach(b => { if (dayData[b.id]) counts[b.id]++; });
+  });
+
+  return { todayData: daily[t], newlyEarned, counts };
+}
+
+function renderBadges(earned, newlyEarned) {
+  const grid = $('badge-grid');
+  grid.innerHTML = '';
+  BADGES.forEach(b => {
+    const isEarned = earned[b.id];
+    const isNew = newlyEarned.has(b.id);
+    const div = document.createElement('div');
+    div.className = 'badge-item ' + (isNew ? 'earned-new' : isEarned ? 'earned' : 'locked');
+    div.innerHTML = `<span class="badge-icon">${b.icon}</span><span class="badge-name">${b.name}</span>`;
+    div.title = b.desc;
+    grid.appendChild(div);
+  });
+}
+
+function renderDailyBadges(todayData, newlyEarned, counts) {
+  const grid = $('daily-badge-grid');
+  grid.innerHTML = '';
+  DAILY_BADGES.forEach(b => {
+    const isEarned = todayData && todayData[b.id];
+    const isNew = newlyEarned.has(b.id);
+    const div = document.createElement('div');
+    div.className = 'daily-badge-item ' + (isNew ? 'earned-new' : isEarned ? 'earned' : 'locked');
+    div.innerHTML = `
+      <span class="daily-badge-icon">${b.icon}</span>
+      <div class="daily-badge-info">
+        <div class="daily-badge-name">${b.name}</div>
+        <div class="daily-badge-desc">${b.desc}</div>
+        ${counts[b.id] > 0 ? `<div class="daily-count">通算 ${counts[b.id]}日達成</div>` : ''}
+      </div>`;
+    grid.appendChild(div);
+  });
+}
+
 function showResult() {
   const total = quizQueue.length;
   const pct = Math.round(correctCount / total * 100);
@@ -325,8 +501,17 @@ function showResult() {
   let msg = pct >= 90 ? '素晴らしい！ほぼ完璧です🎉' : pct >= 70 ? 'よくできました！もう少しで満点' : pct >= 50 ? 'まずまずです。復習してみましょう' : '復習して再チャレンジ！';
   $('result-label').textContent = `${total}問中 ${correctCount}問正解　${msg}`;
 
+  // バッジ評価
+  const chapters = allSelected ? Object.keys(allQuestions) : Array.from(selectedChapters);
+  const { earned, newlyEarned } = evaluateBadges(pct, total, chapters);
+  const { todayData, newlyEarned: dailyNew, counts } = evaluateDailyBadges(pct);
+
+  renderDailyBadges(todayData, dailyNew, counts);
+  renderBadges(earned, newlyEarned);
+
+  // 問題履歴
   const hist = $('history-section');
-  hist.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;">今回の記録</div>';
+  hist.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;margin-top:1rem;">今回の記録</div>';
   sessionHistory.forEach((h, i) => {
     const div = document.createElement('div');
     div.className = 'history-item';
@@ -343,7 +528,6 @@ function goSetup() {
   showScreen('screen-setup');
 }
 
-// 起動
 init();
 </script>
 </body>
