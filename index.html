@@ -49,8 +49,18 @@ button:active { transform: scale(0.98); }
 .stat-card .s-label { font-size: 12px; color: #888; margin-bottom: 4px; }
 .stat-card .s-val { font-size: 22px; font-weight: 500; }
 .history-section { margin-top: 1.5rem; }
-.history-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 0.5px solid #ddd; font-size: 14px; }
+.history-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 0.5px solid #ddd; font-size: 14px; cursor: pointer; }
 .history-item:last-child { border-bottom: none; }
+.history-item:hover { background: #f9f9f7; }
+.history-item .q-arrow { font-size: 11px; color: #aaa; margin-left: 6px; transition: transform 0.2s; }
+.history-item.open .q-arrow { transform: rotate(90deg); }
+.history-detail { display: none; padding: 0.7rem 0.9rem; margin: -0.15rem 0 0.6rem; background: #f5f4f0; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+.history-detail.show { display: block; }
+.history-detail .h-row { display: flex; gap: 6px; margin-bottom: 3px; }
+.history-detail .h-row:last-child { margin-bottom: 0; }
+.history-detail .h-label { min-width: 70px; color: #888; flex-shrink: 0; }
+.history-detail .h-val.wrong { color: #b91c1c; font-weight: 500; }
+.history-detail .h-val.correct { color: #15803d; font-weight: 500; }
 .tag { font-size: 12px; border-radius: 20px; padding: 2px 10px; }
 .tag-pass { background: #f0fdf4; color: #15803d; }
 .tag-fail { background: #fef2f2; color: #b91c1c; }
@@ -167,6 +177,9 @@ const BADGES = [
   { id: 'allchap',  icon: '🔥', name: '全章制覇',      desc: '全6章で出題' },
   { id: 'study30',  icon: '📚', name: '猛勉強',        desc: '30問クリア' },
   { id: 'streak10', icon: '🎯', name: '連続正解',      desc: '10問連続正解' },
+  { id: 'streak80', icon: '🎖️', name: '3連続80%以上', desc: '3回連続で正答率80%以上' },
+  { id: 'streak90', icon: '🏆', name: '3連続90%以上', desc: '3回連続で正答率90%以上' },
+  { id: 'streak100', icon: '👑', name: '3連続100%',   desc: '3回連続で全問正解' },
 ];
 
 // デイリーバッジ定義
@@ -193,6 +206,7 @@ const TOTAL_CHAPTERS = 6;
 // localStorage キー
 const LS_BADGES    = 'chocoken_badges';
 const LS_DAILY     = 'chocoken_daily';
+const LS_SCORE_STREAK = 'chocoken_score_streak';
 
 function today() {
   return new Date().toISOString().slice(0, 10); // "2025-07-04"
@@ -209,6 +223,12 @@ function loadDaily() {
 }
 function saveDaily(data) {
   localStorage.setItem(LS_DAILY, JSON.stringify(data));
+}
+function loadScoreStreak() {
+  try { return JSON.parse(localStorage.getItem(LS_SCORE_STREAK)) || { s80: 0, s90: 0, s100: 0 }; } catch { return { s80: 0, s90: 0, s100: 0 }; }
+}
+function saveScoreStreak(data) {
+  localStorage.setItem(LS_SCORE_STREAK, JSON.stringify(data));
 }
 
 function showScreen(id) {
@@ -370,7 +390,7 @@ function showQuestion() {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
     btn.innerHTML = `<span class="key">${k}</span><span>${choices[k]}</span>`;
-    btn.onclick = () => selectAnswer(k, answer, q.explanation);
+    btn.onclick = () => selectAnswer(k, answer, q.explanation, choices);
     choicesEl.appendChild(btn);
   });
 
@@ -379,7 +399,7 @@ function showQuestion() {
   $('btn-next').textContent = currentIdx < quizQueue.length - 1 ? '次の問題' : '結果を見る';
 }
 
-function selectAnswer(selected, answer, explanation) {
+function selectAnswer(selected, answer, explanation, choices) {
   $('choices').querySelectorAll('.choice-btn').forEach(btn => {
     btn.disabled = true;
     const k = btn.querySelector('.key').textContent;
@@ -395,7 +415,14 @@ function selectAnswer(selected, answer, explanation) {
   } else {
     consecutiveCorrect = 0;
   }
-  sessionHistory.push({ question: quizQueue[currentIdx].question, correct: isCorrect, chapter: quizQueue[currentIdx].chapter });
+  sessionHistory.push({
+    question: quizQueue[currentIdx].question,
+    correct: isCorrect,
+    chapter: quizQueue[currentIdx].chapter,
+    userAnswer: choices[selected],
+    correctAnswer: choices[answer],
+    explanation: explanation
+  });
 
   const expEl = $('explanation');
   expEl.textContent = (isCorrect ? '✓ 正解！　' : '✗ 不正解　') + explanation;
@@ -425,6 +452,16 @@ function evaluateBadges(pct, total, chapters) {
   if (chapters.length >= TOTAL_CHAPTERS) grant('allchap');
   if (total >= 30) grant('study30');
   if (maxConsecutive >= 10) grant('streak10');
+
+  // 3回連続で一定の正答率以上を達成したかを判定
+  const streak = loadScoreStreak();
+  streak.s80  = pct >= 80  ? (streak.s80  || 0) + 1 : 0;
+  streak.s90  = pct >= 90  ? (streak.s90  || 0) + 1 : 0;
+  streak.s100 = pct === 100 ? (streak.s100 || 0) + 1 : 0;
+  saveScoreStreak(streak);
+  if (streak.s80  >= 3) grant('streak80');
+  if (streak.s90  >= 3) grant('streak90');
+  if (streak.s100 >= 3) grant('streak100');
 
   saveBadges(earned);
   return { earned, newlyEarned };
@@ -513,10 +550,25 @@ function showResult() {
   const hist = $('history-section');
   hist.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;margin-top:1rem;">今回の記録</div>';
   sessionHistory.forEach((h, i) => {
-    const div = document.createElement('div');
-    div.className = 'history-item';
-    div.innerHTML = `<span style="flex:1;font-size:13px;padding-right:8px">Q${i+1}. ${h.question.slice(0, 30)}${h.question.length > 30 ? '…' : ''}</span><span class="tag ${h.correct ? 'tag-pass' : 'tag-fail'}">${h.correct ? '正解' : '不正解'}</span>`;
-    hist.appendChild(div);
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `<span style="flex:1;font-size:13px;padding-right:8px">Q${i+1}. ${h.question.slice(0, 30)}${h.question.length > 30 ? '…' : ''}<span class="q-arrow">▶</span></span><span class="tag ${h.correct ? 'tag-pass' : 'tag-fail'}">${h.correct ? '正解' : '不正解'}</span>`;
+
+    const detail = document.createElement('div');
+    detail.className = 'history-detail';
+    detail.innerHTML = `
+      <div class="h-row"><span class="h-label">問題</span><span>${h.question}</span></div>
+      <div class="h-row"><span class="h-label">あなたの回答</span><span class="h-val ${h.correct ? 'correct' : 'wrong'}">${h.userAnswer}</span></div>
+      <div class="h-row"><span class="h-label">正解</span><span class="h-val correct">${h.correctAnswer}</span></div>
+      ${h.explanation ? `<div class="h-row"><span class="h-label">解説</span><span>${h.explanation}</span></div>` : ''}`;
+
+    item.onclick = () => {
+      const isOpen = detail.classList.toggle('show');
+      item.classList.toggle('open', isOpen);
+    };
+
+    hist.appendChild(item);
+    hist.appendChild(detail);
   });
 
   showScreen('screen-result');
